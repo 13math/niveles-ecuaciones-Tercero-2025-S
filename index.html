@@ -114,72 +114,21 @@
         const levels = ["Bronce", "Plata", "Oro", "Diamante", "Maestro"];
         let users = JSON.parse(localStorage.getItem("users")) || {};
         let currentUser = null;
+        let adminHash;
 
-        function login() {
-            const username = document.getElementById("username").value.trim();
-            if (!username) {
-                document.getElementById("login-feedback").textContent = "Por favor, ingresa un nombre de usuario.";
-                return;
-            }
-
-            if (!users[username]) {
-                users[username] = { levelIndex: 0, progress: [] };
-            }
-            currentUser = username;
-            document.getElementById("player-name").textContent = currentUser;
-            updateGameView();
-            switchView("game-container");
+        // Cargar el hash de administrador desde el archivo JSON
+        async function loadAdminConfig() {
+            const response = await fetch("config.json");
+            const config = await response.json();
+            adminHash = config.adminHash;
         }
 
-        function updateGameView() {
-            const levelIndex = users[currentUser].levelIndex;
-            document.getElementById("current-level").textContent = levels[levelIndex];
-            generateEquation(levelIndex);
-        }
-
-        function generateEquation(levelIndex) {
-            const a = Math.floor(Math.random() * 10) + 1;
-            const b = Math.floor(Math.random() * 20) - 10;
-            const x = Math.floor(Math.random() * 10);
-            const c = a * x + b;
-
-            const formattedB = b >= 0 ? `+ ${b}` : `- ${Math.abs(b)}`;
-            document.getElementById("equation").textContent = `${a}x ${formattedB} = ${c}`;
-            document.getElementById("equation").dataset.answer = x;
-        }
-
-        function checkAnswer() {
-            const answer = parseInt(document.getElementById("answer").value);
-            const correctAnswer = parseInt(document.getElementById("equation").dataset.answer);
-            if (answer === correctAnswer) {
-                advanceLevel();
-            } else {
-                document.getElementById("game-feedback").textContent = "Respuesta incorrecta. Intenta de nuevo.";
-            }
-        }
-
-        function advanceLevel() {
-            const levelIndex = users[currentUser].levelIndex;
-            if (levelIndex < levels.length - 1) {
-                users[currentUser].levelIndex++;
-                users[currentUser].progress[levelIndex] = new Date().toLocaleDateString();
-                localStorage.setItem("users", JSON.stringify(users));
-                updateGameView();
-                document.getElementById("game-feedback").textContent = "¡Nivel completado! Avanzas al siguiente.";
-                loadAdminView();
-            } else {
-                document.getElementById("game-feedback").textContent = "¡Felicidades! Has completado todos los niveles.";
-            }
-        }
-
-        function logout() {
-            currentUser = null;
-            switchView("login-container");
-        }
-
-        function requestAdminAccess() {
+        async function requestAdminAccess() {
+            if (!adminHash) await loadAdminConfig();
             const password = prompt("Introduce la contraseña de administrador:");
-            if (password === "admin123") {
+            const hashInput = await md5(password);
+
+            if (hashInput === adminHash) {
                 switchView("admin-container");
                 loadAdminView();
             } else {
@@ -187,36 +136,22 @@
             }
         }
 
-        function loadAdminView() {
-            const records = document.getElementById("user-records");
-            records.innerHTML = "";
-            for (const [username, data] of Object.entries(users)) {
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${username}</td>
-                    ${levels.map((level, i) => `<td>${data.progress[i] || "-"}</td>`).join("")}
-                    <td><button onclick="deleteUser('${username}')">Eliminar</button></td>
-                `;
-                records.appendChild(row);
-            }
+        function md5(string) {
+            const utf8 = new TextEncoder().encode(string);
+            return crypto.subtle.digest("MD5", utf8).then((hash) => {
+                return Array.from(new Uint8Array(hash))
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join("");
+            });
         }
 
-        function deleteUser(username) {
-            if (confirm(`¿Estás seguro de que quieres eliminar al usuario "${username}"?`)) {
-                delete users[username];
-                localStorage.setItem("users", JSON.stringify(users));
-                loadAdminView();
-            }
-        }
-
-        function logoutAdmin() {
-            switchView("login-container");
-        }
-
+        // Función para alternar vistas
         function switchView(containerId) {
             document.querySelectorAll(".container").forEach(c => c.classList.add("hidden"));
             document.getElementById(containerId).classList.remove("hidden");
         }
+
+        loadAdminConfig(); // Llamar al cargador de configuración al inicio
     </script>
 </body>
 </html>
