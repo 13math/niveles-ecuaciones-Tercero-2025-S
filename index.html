@@ -114,21 +114,32 @@
         const levels = ["Bronce", "Plata", "Oro", "Diamante", "Maestro"];
         let users = JSON.parse(localStorage.getItem("users")) || {};
         let currentUser = null;
-        let adminHash;
+        let adminHash = null;
 
         // Cargar el hash de administrador desde el archivo JSON
         async function loadAdminConfig() {
-            const response = await fetch("config.json");
-            const config = await response.json();
-            adminHash = config.adminHash;
+            try {
+                const response = await fetch("config.json");
+                if (!response.ok) throw new Error("Error al cargar el archivo config.json");
+                const config = await response.json();
+                adminHash = config.adminHash;
+                console.log("Configuración cargada correctamente.");
+            } catch (error) {
+                console.error("Error al cargar config.json:", error);
+            }
         }
 
         async function requestAdminAccess() {
             if (!adminHash) await loadAdminConfig();
             const password = prompt("Introduce la contraseña de administrador:");
+            if (!password) return;
+
             const hashInput = await md5(password);
+            console.log(`Hash ingresado: ${hashInput}`);
+            console.log(`Hash esperado: ${adminHash}`);
 
             if (hashInput === adminHash) {
+                alert("Acceso concedido.");
                 switchView("admin-container");
                 loadAdminView();
             } else {
@@ -145,13 +156,45 @@
             });
         }
 
-        // Función para alternar vistas
+        function login() {
+            const username = document.getElementById("username").value.trim();
+            if (!username) {
+                document.getElementById("login-feedback").textContent = "Por favor, ingresa un nombre de usuario.";
+                return;
+            }
+
+            if (!users[username]) {
+                users[username] = { levelIndex: 0, progress: [] };
+            }
+            currentUser = username;
+            document.getElementById("player-name").textContent = currentUser;
+            updateGameView();
+            switchView("game-container");
+        }
+
+        function updateGameView() {
+            const levelIndex = users[currentUser].levelIndex;
+            document.getElementById("current-level").textContent = levels[levelIndex];
+            generateEquation(levelIndex);
+        }
+
+        function generateEquation(levelIndex) {
+            const a = Math.floor(Math.random() * 10) + 1;
+            const b = Math.floor(Math.random() * 20) - 10;
+            const x = Math.floor(Math.random() * 10);
+            const c = a * x + b;
+
+            const formattedB = b >= 0 ? `+ ${b}` : `- ${Math.abs(b)}`;
+            document.getElementById("equation").textContent = `${a}x ${formattedB} = ${c}`;
+            document.getElementById("equation").dataset.answer = x;
+        }
+
         function switchView(containerId) {
             document.querySelectorAll(".container").forEach(c => c.classList.add("hidden"));
             document.getElementById(containerId).classList.remove("hidden");
         }
 
-        loadAdminConfig(); // Llamar al cargador de configuración al inicio
+        loadAdminConfig();
     </script>
 </body>
 </html>
